@@ -300,3 +300,9 @@ python3 tools/demo_track.py video -f exps/example/mot/yolox_x_mix_det.py -c pret
 ## Acknowledgement
 
 A large part of the code is borrowed from [YOLOX](https://github.com/Megvii-BaseDetection/YOLOX), [FairMOT](https://github.com/ifzhang/FairMOT), [TransTrack](https://github.com/PeizeSun/TransTrack) and [JDE-Cpp](https://github.com/samylee/Towards-Realtime-MOT-Cpp). Many thanks for their wonderful works.
+
+python tools/demo_track.py video -f exps/example/mot/yolox_x_mot17_half.py -c ./pretrained/bytetrack_x_mot17.pth.tar --path ./hiv00047_1_29.mp4 --fp16 --fuse --save_result
+
+python tools/demo_track.py video -f /home/zhulin/code/ByteTrack/exps/example/mot/yolox_x_mix_mot20_ch.py -c /home/zhulin/code/ByteTrack/pretrained/bytetrack_x_mot20.tar --path ./data/64/hiv00009.mp4 --fp16 --fuse --save_result
+
+

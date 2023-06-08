@@ -17,6 +17,24 @@ from yolox.tracking_utils.timer import Timer
 
 IMAGE_EXT = [".jpg", ".jpeg", ".webp", ".bmp", ".png"]
 
+from cnocr import CnOcr
+import re
+
+ocr = CnOcr(rec_model_name='ch_PP-OCRv3')  # 所有参数都使用默认值
+def get_one_time(frame):
+    # out = ocr.ocr(frame[:200,:1000,::])[0]
+    out = ocr.ocr(frame[:,:,::-1])[0]
+    print(out)
+    txt =out['text'].replace(" ", "").replace('：','')
+    txt = re.sub(r"[\u4e00-\u9fa5]+", "", txt)
+
+    try:
+        if len(txt) == 14:
+            txt = eval(txt)
+            return txt
+    except:
+        return None
+    
 
 def make_parser():
     parser = argparse.ArgumentParser("ByteTrack Demo!")
@@ -175,7 +193,7 @@ class Predictor(object):
         return outputs, img_info
 
 
-def image_demo(predictor, vis_folder, current_time, args):
+def image_demo(predictor, vis_folder, video_name, args):
     if osp.isdir(args.path):
         files = get_image_list(args.path)
     else:
@@ -214,8 +232,8 @@ def image_demo(predictor, vis_folder, current_time, args):
 
         # result_image = predictor.visual(outputs[0], img_info, predictor.confthre)
         if args.save_result:
-            timestamp = time.strftime("%Y_%m_%d_%H_%M_%S", current_time)
-            save_folder = osp.join(vis_folder, timestamp)
+            # timestamp = time.strftime("%Y_%m_%d_%H_%M_%S", current_time)
+            save_folder = osp.join(vis_folder, video_name)
             os.makedirs(save_folder, exist_ok=True)
             cv2.imwrite(osp.join(save_folder, osp.basename(img_path)), online_im)
 
@@ -227,43 +245,61 @@ def image_demo(predictor, vis_folder, current_time, args):
             break
 
     if args.save_result:
-        res_file = osp.join(vis_folder, f"{timestamp}.txt")
+        res_file = osp.join(vis_folder, f"{video_name}.txt")
         with open(res_file, 'w') as f:
             f.writelines(results)
         logger.info(f"save results to {res_file}")
 
 
-def imageflow_demo(predictor, vis_folder, current_time, args):
+def imageflow_demo(predictor, vis_folder, video_name, args):
+    save_index =0
     cap = cv2.VideoCapture(args.path if args.demo == "video" else args.camid)
     width = cap.get(cv2.CAP_PROP_FRAME_WIDTH)  # float
     height = cap.get(cv2.CAP_PROP_FRAME_HEIGHT)  # float
     fps = cap.get(cv2.CAP_PROP_FPS)
-    timestamp = time.strftime("%Y_%m_%d_%H_%M_%S", current_time)
-    save_folder = osp.join(vis_folder, timestamp)
+
+
+    # 获取视频编码格式
+    fourcc = int(cap.get(cv2.CAP_PROP_FOURCC))
+    # 将四字符编码转换为字符串格式
+    codec = chr(fourcc & 0xFF) + chr((fourcc >> 8) & 0xFF) + chr((fourcc >> 16) & 0xFF) + chr((fourcc >> 24) & 0xFF)
+    # 打印编码格式
+    print("视频编码格式: {}   {}fps".format(codec,fps))
+
+    # timestamp = time.strftime("%Y_%m_%d_%H_%M_%S", current_time)
+    save_folder = osp.join(vis_folder)
     os.makedirs(save_folder, exist_ok=True)
     if args.demo == "video":
-        save_path = osp.join(save_folder, args.path.split("/")[-1])
+        save_path = osp.join(save_folder, video_name+'_{}.mp4')
     else:
-        save_path = osp.join(save_folder, "camera.mp4")
+        save_path = osp.join(save_folder, "camera_{}.mp4")
     logger.info(f"video save_path is {save_path}")
-    vid_writer = cv2.VideoWriter(
-        save_path, cv2.VideoWriter_fourcc(*"mp4v"), fps, (int(width), int(height))
-    )
-    tracker = BYTETracker(args, frame_rate=30)
+
+    tracker = BYTETracker(args, frame_rate=fps//2)
     timer = Timer()
     frame_id = 0
     results = []
+    start =0
+    noperson_frame_num =0
+    starttime ,endtime =None,None
     while True:
         if frame_id % 20 == 0:
             logger.info('Processing frame {} ({:.2f} fps)'.format(frame_id, 1. / max(1e-5, timer.average_time)))
         ret_val, frame = cap.read()
         if ret_val:
+            print(type(frame))
+            # print(frame.shape)
+            # test = get_one_time(frame)   
+            # print(test) 
+
+            isperson=0
             outputs, img_info = predictor.inference(frame, timer)
             if outputs[0] is not None:
+
                 online_targets = tracker.update(outputs[0], [img_info['height'], img_info['width']], exp.test_size)
                 online_tlwhs = []
                 online_ids = []
-                online_scores = []
+                online_scores = []                
                 for t in online_targets:
                     tlwh = t.tlwh
                     tid = t.track_id
@@ -273,32 +309,95 @@ def imageflow_demo(predictor, vis_folder, current_time, args):
                         online_ids.append(tid)
                         online_scores.append(t.score)
                         results.append(
-                            f"{frame_id},{tid},{tlwh[0]:.2f},{tlwh[1]:.2f},{tlwh[2]:.2f},{tlwh[3]:.2f},{t.score:.2f},-1,-1,-1\n"
+                            f"{start},{tid},{tlwh[0]:.2f},{tlwh[1]:.2f},{tlwh[2]:.2f},{tlwh[3]:.2f},{t.score:.2f},-1,-1,-1\n"
                         )
+                    if t.score > 0.9:
+                        isperson =1                        
+
                 timer.toc()
                 online_im = plot_tracking(
-                    img_info['raw_img'], online_tlwhs, online_ids, frame_id=frame_id + 1, fps=1. / timer.average_time
+                    img_info['raw_img'], online_tlwhs, online_ids, frame_id=start + 1, fps=1. / timer.average_time
                 )
+
             else:
                 timer.toc()
                 online_im = img_info['raw_img']
-            if args.save_result:
+                # print('origin img:{}/{}'.format(start,frame_id))
+            
+            if start or isperson:  #是否开始保存
+                start += 1         #记录帧数
+                if start ==1:      #第一帧 重置vid_writer
+                    # print('init new video  :{} {}'.format(save_index ,frame_id ))
+                    # print('init new video:{}'.format(save_path.format(save_index+1)))
+                    vid_writer = cv2.VideoWriter(
+                        save_path.format(save_index), cv2.VideoWriter_fourcc(*"mp4v"), fps, (int(width), int(height))
+                    )  
+                    vid_writer_origin = cv2.VideoWriter(
+                        save_path.format(str(save_index) + '_origin'), cv2.VideoWriter_fourcc(*"mp4v"), fps, (int(width), int(height))
+                    ) 
+                    # if starttime is None:
+                    #     starttime = get_one_time(frame)                       
+
+            if args.save_result and start:  #start 为1 时开始保存
                 vid_writer.write(online_im)
-            ch = cv2.waitKey(1)
-            if ch == 27 or ch == ord("q") or ch == ord("Q"):
-                break
+                vid_writer_origin.write(img_info['raw_img']) #frame
+
+            if start :
+                if isperson == 0:
+                    noperson_frame_num +=1
+                else:
+                    noperson_frame_num =0
+
+                if noperson_frame_num > fps *2  or start >= fps *15 :  #2s  截断
+                    if start >= fps *3: # >=5s 保存
+                        # print('save video :{} {}/{}'.format(save_index ,start ,frame_id))
+                        # print('start new video:{}'.format(save_path.format(save_index+1)))
+
+                        # if endtime is None:
+                        #     endtime = get_one_time(img_info['raw_img'])
+                        # print('{} ---{}'.format(starttime,endtime))
+
+                        if args.save_result:
+                            res_file = osp.join(vis_folder, f"{video_name}_{save_index}.txt")
+                            with open(res_file, 'w') as f:
+                                f.writelines(results)
+                            logger.info(f"save results to {res_file}")
+                        save_index +=1  #成功保存上一个才会+1
+                    # else:
+                    #     print('delet video  :{} {}/{}'.format(save_index ,start,frame_id ))
+                    results = []
+                    noperson_frame_num =0
+                    start =0
+                    
+            else:
+                results =[]
+                noperson_frame_num =0
+
+            # ch = cv2.waitKey(1)
+            # if ch == 27 or ch == ord("q") or ch == ord("Q"):
+            #     break
         else:
             break
         frame_id += 1
 
-    if args.save_result:
-        res_file = osp.join(vis_folder, f"{timestamp}.txt")
-        with open(res_file, 'w') as f:
-            f.writelines(results)
-        logger.info(f"save results to {res_file}")
-
+    if args.save_result :
+        if start >= fps *3:
+            res_file = osp.join(vis_folder, f"{video_name}_{save_index}.txt")
+            with open(res_file, 'w') as f:
+                f.writelines(results)
+            logger.info(f"save results to {res_file}")
+        elif start >0 :
+            try:
+            # 删除文件
+                os.remove(save_path.format(save_index))
+                os.remove(save_path.format(str(save_index) + '_origin'))
+            except OSError as e:
+                print(f"尝试删除空视频失败: {e}")
+    # 释放视频对象
+    cap.release()
 
 def main(exp, args):
+    video_name = args.path.split('/')[-1].split('.')[0]
     if not args.experiment_name:
         args.experiment_name = exp.exp_name
 
@@ -306,7 +405,7 @@ def main(exp, args):
     os.makedirs(output_dir, exist_ok=True)
 
     if args.save_result:
-        vis_folder = osp.join(output_dir, "track_vis")
+        vis_folder = osp.join(output_dir, video_name)
         os.makedirs(vis_folder, exist_ok=True)
 
     if args.trt:
@@ -358,12 +457,13 @@ def main(exp, args):
         decoder = None
 
     predictor = Predictor(model, exp, trt_file, decoder, args.device, args.fp16)
-    current_time = time.localtime()
-    if args.demo == "image":
-        image_demo(predictor, vis_folder, current_time, args)
-    elif args.demo == "video" or args.demo == "webcam":
-        imageflow_demo(predictor, vis_folder, current_time, args)
 
+    # current_time = time.localtime() 
+    
+    if args.demo == "image":
+        image_demo(predictor, vis_folder, video_name, args)
+    elif args.demo == "video" or args.demo == "webcam":
+        imageflow_demo(predictor, vis_folder, video_name, args)
 
 if __name__ == "__main__":
     args = make_parser().parse_args()
