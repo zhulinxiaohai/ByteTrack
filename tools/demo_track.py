@@ -39,7 +39,7 @@ def get_one_time(frame):
 def make_parser():
     parser = argparse.ArgumentParser("ByteTrack Demo!")
     parser.add_argument(
-        "demo", default="image", help="demo type, eg. image, video and webcam"
+        "demo", default="video", help="demo type, eg. image, video and webcam"
     )
     parser.add_argument("-expn", "--experiment-name", type=str, default=None)
     parser.add_argument("-n", "--name", type=str, default=None, help="model name")
@@ -52,6 +52,7 @@ def make_parser():
     parser.add_argument(
         "--save_result",
         action="store_true",
+        default=True,
         help="whether to save the inference result of image/video",
     )
 
@@ -59,11 +60,11 @@ def make_parser():
     parser.add_argument(
         "-f",
         "--exp_file",
-        default=None,
+        default='exps/example/mot/yolox_x_mix_mot20_ch.py',
         type=str,
         help="pls input your expriment description file",
     )
-    parser.add_argument("-c", "--ckpt", default=None, type=str, help="ckpt for eval")
+    parser.add_argument("-c", "--ckpt", default='pretrained/bytetrack_x_mot20.tar', type=str, help="ckpt for eval")
     parser.add_argument(
         "--device",
         default="gpu",
@@ -77,14 +78,14 @@ def make_parser():
     parser.add_argument(
         "--fp16",
         dest="fp16",
-        default=False,
+        default=True,
         action="store_true",
         help="Adopting mix precision evaluating.",
     )
     parser.add_argument(
         "--fuse",
         dest="fuse",
-        default=False,
+        default=True,
         action="store_true",
         help="Fuse conv and bn for testing.",
     )
@@ -275,22 +276,19 @@ def imageflow_demo(predictor, vis_folder, video_name, args):
         save_path = osp.join(save_folder, "camera_{}.mp4")
     logger.info(f"video save_path is {save_path}")
 
-    tracker = BYTETracker(args, frame_rate=fps//2)
+    tracker = BYTETracker(args, frame_rate=fps)
     timer = Timer()
     frame_id = 0
     results = []
     start =0
     noperson_frame_num =0
-    starttime ,endtime =None,None
+    # starttime ,endtime =None,None
     while True:
-        if frame_id % 20 == 0:
+        if frame_id % fps == 0:
             logger.info('Processing frame {} ({:.2f} fps)'.format(frame_id, 1. / max(1e-5, timer.average_time)))
         ret_val, frame = cap.read()
         if ret_val:
-            print(type(frame))
-            # print(frame.shape)
-            # test = get_one_time(frame)   
-            # print(test) 
+            
 
             isperson=0
             outputs, img_info = predictor.inference(frame, timer)
@@ -322,13 +320,10 @@ def imageflow_demo(predictor, vis_folder, video_name, args):
             else:
                 timer.toc()
                 online_im = img_info['raw_img']
-                # print('origin img:{}/{}'.format(start,frame_id))
             
             if start or isperson:  #是否开始保存
                 start += 1         #记录帧数
                 if start ==1:      #第一帧 重置vid_writer
-                    # print('init new video  :{} {}'.format(save_index ,frame_id ))
-                    # print('init new video:{}'.format(save_path.format(save_index+1)))
                     vid_writer = cv2.VideoWriter(
                         save_path.format(save_index), cv2.VideoWriter_fourcc(*"mp4v"), fps, (int(width), int(height))
                     )  
@@ -349,22 +344,13 @@ def imageflow_demo(predictor, vis_folder, video_name, args):
                     noperson_frame_num =0
 
                 if noperson_frame_num > fps *2  or start >= fps *15 :  #2s  截断
-                    if start >= fps *3: # >=5s 保存
-                        # print('save video :{} {}/{}'.format(save_index ,start ,frame_id))
-                        # print('start new video:{}'.format(save_path.format(save_index+1)))
-
-                        # if endtime is None:
-                        #     endtime = get_one_time(img_info['raw_img'])
-                        # print('{} ---{}'.format(starttime,endtime))
-
+                    if start >= fps *3: # >=3s 保存
                         if args.save_result:
                             res_file = osp.join(vis_folder, f"{video_name}_{save_index}.txt")
                             with open(res_file, 'w') as f:
                                 f.writelines(results)
                             logger.info(f"save results to {res_file}")
                         save_index +=1  #成功保存上一个才会+1
-                    # else:
-                    #     print('delet video  :{} {}/{}'.format(save_index ,start,frame_id ))
                     results = []
                     noperson_frame_num =0
                     start =0

@@ -306,3 +306,6 @@ python tools/demo_track.py video -f exps/example/mot/yolox_x_mot17_half.py -c ./
 python tools/demo_track.py video -f /home/zhulin/code/ByteTrack/exps/example/mot/yolox_x_mix_mot20_ch.py -c /home/zhulin/code/ByteTrack/pretrained/bytetrack_x_mot20.tar --path ./data/64/hiv00009.mp4 --fp16 --fuse --save_result
 
 
+需要安装环境，然后下载预训练权重到 默认使用 ./pretrained/bytetrack_x_mot20.tar
+运行代码：
+python tools/demo_track.py video --path ./data/64/hiv00009.mp4 
