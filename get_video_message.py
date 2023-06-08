@@ -13,7 +13,7 @@ from scipy.optimize import linear_sum_assignment
 def parse_args():
     parser = argparse.ArgumentParser(description='PoseC3D demo')
     # parser.add_argument('--video', default='split/hiv00047.mp4', help='video file/url')
-    parser.add_argument('--video', default='data/64/hiv00001.mp4', help='video file/url')
+    parser.add_argument('--path', default='data/64/hiv00001.mp4', help='video file/url')
     # parser.add_argument('--out_filename', default='split/out/', help='output filename')
     # parser.add_argument(
     #     '--config',
@@ -89,23 +89,30 @@ def get_one_time(frame):
 
 def video_msg(video_path ):
 
+    os.makedirs('./tmp1', exist_ok=True)
+    frame_tmpl = osp.join('./tmp1', 'img_{:06d}.jpg')
 
-    # # Load the video using imageio
-    # print(video_path)
-    # video = imageio.get_reader(video_path)
-    # fps = video.get_meta_data()['fps'] 
-    # print(video.get_meta_data().keys())
-    # for i in video.get_meta_data().keys():
-    #     print('{}--{}'.format(i, video.get_meta_data()[i]))
+    # Load the video using imageio
+    print(video_path)
+    video = imageio.get_reader(video_path)
+    fps = video.get_meta_data()['fps'] 
+    print(video.get_meta_data().keys())
+    for i in video.get_meta_data().keys():
+        print('{}--{}'.format(i, video.get_meta_data()[i]))
 
-    # print('frame count:',video.count_frames()-1)
+    print('frame count:',video.count_frames()-1)
     # start_time =None
-    # for idx, frame in enumerate(video):
-    #     if start_time is None:
-    #         start_time = get_one_time(frame )
 
-    #         if start_time is not None:
-    #             break
+    for idx, frame in enumerate(video):
+                # print(idx)
+        frame_path = frame_tmpl.format(idx + 1)
+        cv2.imwrite(frame_path, frame)
+       
+        # if start_time is None:
+        #     start_time = get_one_time(frame )
+
+        #     if start_time is not None:
+        #         break
 
 
 
@@ -118,11 +125,21 @@ def video_msg(video_path ):
     fps = video.get(cv2.CAP_PROP_FPS)
     width = int(video.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(video.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    frame_index  = int(video.get(cv2.CAP_PROP_FRAME_COUNT)) -5
+    frame_index  = int(video.get(cv2.CAP_PROP_FRAME_COUNT)) 
 
     print(fps,width,height,frame_index)
 
     success, frame = video.read()
+
+    cnt =0
+    while success:
+        # print(idx)
+        frame_path = frame_tmpl.format(cnt + 1)
+        cv2.imwrite(frame_path, frame)
+        cnt += 1
+        success, frame = video.read()
+
+
     print(frame.shape)
     start_time = get_one_time(frame )
 
@@ -130,11 +147,11 @@ def video_msg(video_path ):
     
 
     # 读取指定帧的图像
-    video.set(cv2.CAP_PROP_POS_FRAMES, 100)
-    success, frame = video.read()
-    if success:
-        print(frame.shape)
-        endtime = get_one_time(frame )
+    # video.set(cv2.CAP_PROP_POS_FRAMES, 100)
+    # success, frame = video.read()
+    # if success:
+    #     print(frame.shape)
+    #     endtime = get_one_time(frame )
 
 
     video.release()
@@ -152,7 +169,7 @@ def video_msg(video_path ):
 
 def main():
     args = parse_args()
-    fps = video_msg(args.video)
+    fps = video_msg(args.path)
 
 if __name__ == '__main__':
     main()

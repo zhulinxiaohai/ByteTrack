@@ -58,7 +58,7 @@ LINETYPE = 1
 def parse_args():
     parser = argparse.ArgumentParser(description='PoseC3D demo')
     # parser.add_argument('--video', default='split/hiv00047.mp4', help='video file/url')
-    parser.add_argument('--video', default='data/64/hiv00020.mp4', help='video file/url')
+    parser.add_argument('--video', default='data/64/hiv00007.mp4', help='video file/url')
     parser.add_argument('--out_filename', default='split/out/', help='output filename')
     parser.add_argument(
         '--config',
@@ -153,10 +153,11 @@ def main():
     video_name = osp.basename( osp.splitext(args.video)[0])
 
     # folder = osp.dirname(args.video)
-    args.out_filename = osp.join(osp.dirname(args.video), 'split')
+    # args.out_filename = osp.join(osp.dirname(args.video), 'split')
+    args.out_filename = osp.join('out')
 
     print(args.out_filename)
-    frame_paths ,fps = frame_extraction(args.video,get =300)
+    frame_paths ,fps = frame_extraction(args.video,get =3000)
     num_frame = len(frame_paths)
     print('frame len:{}  {}fps'.format(num_frame,fps))
 

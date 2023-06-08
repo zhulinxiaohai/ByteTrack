@@ -256,24 +256,24 @@ def imageflow_demo(predictor, vis_folder, video_name, args):
     save_index =0
 
 
-    # cap = imageio.get_reader(args.path)
-    # meta = cap.get_meta_data()
-    # fps = meta['fps'] 
-    # (width, height) = meta['size']
-    # print(meta.keys())
-    # for i in meta.keys():
-    #     print('{}--{}'.format(i, meta[i]))
+    cap = imageio.get_reader(args.path)
+    meta = cap.get_meta_data()
+    fps = meta['fps'] 
+    (width, height) = meta['size']
+    print(meta.keys())
+    for i in meta.keys():
+        print('{}--{}'.format(i, meta[i]))
 
-    cap = cv2.VideoCapture(args.path if args.demo == "video" else args.camid)
-    width = cap.get(cv2.CAP_PROP_FRAME_WIDTH)  # float
-    height = cap.get(cv2.CAP_PROP_FRAME_HEIGHT)  # float
-    fps = cap.get(cv2.CAP_PROP_FPS)
-    # 获取视频编码格式
-    fourcc = int(cap.get(cv2.CAP_PROP_FOURCC))
-    # 将四字符编码转换为字符串格式
-    codec = chr(fourcc & 0xFF) + chr((fourcc >> 8) & 0xFF) + chr((fourcc >> 16) & 0xFF) + chr((fourcc >> 24) & 0xFF)
-    # 打印编码格式
-    print("视频编码格式: {}   {}fps {} *{}".format(codec,fps,width,height))
+    # cap = cv2.VideoCapture(args.path if args.demo == "video" else args.camid)
+    # width = cap.get(cv2.CAP_PROP_FRAME_WIDTH)  # float
+    # height = cap.get(cv2.CAP_PROP_FRAME_HEIGHT)  # float
+    # fps = cap.get(cv2.CAP_PROP_FPS)
+    # # 获取视频编码格式
+    # fourcc = int(cap.get(cv2.CAP_PROP_FOURCC))
+    # # 将四字符编码转换为字符串格式
+    # codec = chr(fourcc & 0xFF) + chr((fourcc >> 8) & 0xFF) + chr((fourcc >> 16) & 0xFF) + chr((fourcc >> 24) & 0xFF)
+    # # 打印编码格式
+    # print("视频编码格式: {}   {}fps {} *{}".format(codec,fps,width,height))
 
 
     # timestamp = time.strftime("%Y_%m_%d_%H_%M_%S", current_time)
@@ -285,19 +285,20 @@ def imageflow_demo(predictor, vis_folder, video_name, args):
         save_path = osp.join(save_folder, "camera_{}.mp4")
     logger.info(f"video save_path is {save_path}")
 
-    tracker = BYTETracker(args, frame_rate=fps)
+    tracker = BYTETracker(args, frame_rate=30)
     timer = Timer()
     frame_id = 0
     results = []
     start =0
     noperson_frame_num =0
     # starttime ,endtime =None,None
-    while True:
+    # while True:
+    for frame in cap:
         if frame_id % fps == 0:
             logger.info('Processing frame {} ({:.2f} fps)'.format(frame_id, 1. / max(1e-5, timer.average_time)))
-        ret_val, frame = cap.read()
-        if ret_val:
-            
+        # ret_val, frame = cap.read()
+       # if ret_val:
+        if 1:            
 
             isperson=0
             outputs, img_info = predictor.inference(frame, timer)
@@ -343,8 +344,9 @@ def imageflow_demo(predictor, vis_folder, video_name, args):
                     #     starttime = get_one_time(frame)                       
 
             if args.save_result and start:  #start 为1 时开始保存
-                vid_writer.write(online_im)
-                vid_writer_origin.write(img_info['raw_img']) #frame
+                # print(online_im.shape, type(online_im))
+                vid_writer.write(online_im[:,:,::-1])
+                vid_writer_origin.write(frame[:,:,::-1]) #frame
 
             if start :
                 if isperson == 0:
@@ -389,7 +391,8 @@ def imageflow_demo(predictor, vis_folder, video_name, args):
             except OSError as e:
                 print(f"尝试删除空视频失败: {e}")
     # 释放视频对象
-    cap.release()
+    # cap.release()
+    cap.close()
 
 def main(exp, args):
     video_name = args.path.split('/')[-1].split('.')[0]
